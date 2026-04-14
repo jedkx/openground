@@ -1,0 +1,39 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches:
+      - development
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Lint
+        run: make lint
+
+      - name: Test with coverage
+        run: make test-cov
+
