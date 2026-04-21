@@ -27,12 +27,6 @@ def _env_str(name: str, default: str) -> str:
         return default
     return raw.strip()
 
-
-def _default_milestone_timeline_path() -> str:
-    base = Path(__file__).resolve().parent.parent
-    return str(base / "data" / "demo_documented_milestones.json")
-
-
 @dataclass(frozen=True, slots=True)
 class Settings:
     """Operational parameters for the ground data system."""
@@ -71,7 +65,7 @@ def load_settings() -> Settings:
     milestone_path = (
         str(Path(timeline_override).expanduser())
         if timeline_override and timeline_override.strip()
-        else _default_milestone_timeline_path()
+        else ""
     )
     mode_raw = _env_str("OPENGROUND_TELEMETRY_MODE", "sim").strip().lower()
     if mode_raw == "artemis_timeline":

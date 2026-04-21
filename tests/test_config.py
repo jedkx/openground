@@ -30,7 +30,7 @@ def test_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.history_maxlen == 5000
     assert s.simulation_scenario == "nominal"
     assert s.telemetry_mode == "sim"
-    assert s.milestone_timeline_path.endswith("demo_documented_milestones.json")
+    assert s.milestone_timeline_path == ""
     assert "wheretheiss" in s.iss_api_url
 
 

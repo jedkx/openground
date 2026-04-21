@@ -43,7 +43,7 @@ class GroundStationRuntime:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._mode = settings.telemetry_mode.strip().lower()
-        if self._mode not in ("sim", "milestone_replay", "iss_public"):
+        if self._mode not in ("sim", "milestone_replay", "iss_public", "ingest_only"):
             log.warning("Unknown OPENGROUND_TELEMETRY_MODE=%r; using sim", settings.telemetry_mode)
             self._mode = "sim"
         self.connections = ConnectionManager()
@@ -249,6 +249,11 @@ class GroundStationRuntime:
         period = self._settings.telemetry_period_s
         while True:
             self.state.check_timeout()
+
+            # In ingest-only mode, OpenGround becomes a pure sink and never emits synthetic frames.
+            if self._mode == "ingest_only":
+                await asyncio.sleep(period)
+                continue
 
             if self._mode == "milestone_replay":
                 if self._timeline is None:

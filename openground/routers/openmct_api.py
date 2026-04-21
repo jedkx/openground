@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 
 from fastapi import APIRouter, Query
 
@@ -17,9 +18,31 @@ def create_openmct_router(runtime: GroundStationRuntime) -> APIRouter:
             return default
         return int(value)
 
+    def _numeric_keys(packet: dict) -> list[str]:
+        excluded = {"epoch_ms", "mission_start_epoch_ms", "met_ms"}
+        return sorted(
+            key
+            for key, value in packet.items()
+            if key not in excluded and isinstance(value, (int, float)) and not isinstance(value, bool)
+        )
+
+    def _latest_packet_for_schema() -> dict | None:
+        if runtime.latest_packet is not None:
+            return runtime.latest_packet
+        if isinstance(runtime.history, Iterable) and len(runtime.history) > 0:
+            return runtime.history[-1]
+        return None
+
     @router.get("/telemetry/latest")
     async def latest_telemetry() -> dict:
         return {"data": runtime.latest_packet}
+
+    @router.get("/telemetry/schema")
+    async def telemetry_schema() -> dict:
+        packet = _latest_packet_for_schema()
+        if packet is None:
+            return {"channels": []}
+        return {"channels": _numeric_keys(packet)}
 
     @router.get("/telemetry/history")
     async def telemetry_history(

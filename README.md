@@ -97,8 +97,9 @@ The app uses `OPENGROUND_DATABASE_URL` in `docker-compose.yml`, so table
 ### Telemetry modes
 
 - `sim` (default) with `OPENGROUND_SCENARIO`: `nominal`, `sport`, `gentle`, `stress`
-- `milestone_replay` with `data/demo_documented_milestones.json` or `OPENGROUND_MILESTONE_TIMELINE_PATH`
+- `milestone_replay` with an explicit `OPENGROUND_MILESTONE_TIMELINE_PATH`
 - `iss_public` (network-dependent public API feed)
+- `ingest_only` to disable all synthetic/internal producers and accept only external ingest
 
 Legacy mapping: `artemis_timeline` -> `milestone_replay`.
 
@@ -108,6 +109,15 @@ Legacy mapping: `artemis_timeline` -> `milestone_replay`.
 - REST:
   - `GET /api/openmct/telemetry/latest`
   - `GET /api/openmct/telemetry/history?start=&end=` (epoch ms)
+  - `GET /api/openmct/telemetry/schema` (numeric channel keys discovered from latest/history)
+  - `POST /api/v1/ingest/telemetry` (normalized scalar payload)
+  - `POST /api/v1/ingest/packet` (octet-stream or JSON `packet_base64`)
+  - `POST /api/v1/adapters/envelope` (generic wrapper with `external_event_id`, `event_type`, `payload`)
+
+Envelope adapter compatibility note:
+
+- `external_event_id` is the preferred field.
+- `relay_event_id` is accepted as a backward-compatible alias.
 
 Environment references live in `openground/config.py` and `.env.example`.
 
