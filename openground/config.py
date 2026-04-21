@@ -48,6 +48,14 @@ class Settings:
     telemetry_mode: str
     milestone_timeline_path: str
     iss_api_url: str
+    ingest_enabled: bool
+    """When False, HTTP ingest routes return 503 (simulation-only ground)."""
+
+    ingest_token: str
+    """When non-empty, ingest endpoints require matching Bearer or X-Ingest-Token."""
+
+    database_url: str
+    """When non-empty, finalized frames are archived to Postgres; history API reads from it."""
 
     @property
     def telemetry_period_s(self) -> float:
@@ -74,6 +82,14 @@ def load_settings() -> Settings:
         if iss_url and str(iss_url).strip()
         else "https://api.wheretheiss.at/v1/satellites/25544"
     )
+    ingest_disabled_raw = os.environ.get("OPENGROUND_INGEST_DISABLED", "")
+    ingest_enabled = str(ingest_disabled_raw).strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
     return Settings(
         telemetry_hz=_env_float("OPENGROUND_TELEMETRY_HZ", 1.0),
         link_drop_probability=_env_float("OPENGROUND_LINK_DROP_PROB", 0.08),
@@ -86,4 +102,7 @@ def load_settings() -> Settings:
         telemetry_mode=mode_raw,
         milestone_timeline_path=milestone_path,
         iss_api_url=iss_api,
+        ingest_enabled=ingest_enabled,
+        ingest_token=_env_str("OPENGROUND_INGEST_TOKEN", ""),
+        database_url=_env_str("OPENGROUND_DATABASE_URL", ""),
     )

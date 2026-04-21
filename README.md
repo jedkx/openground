@@ -80,6 +80,20 @@ uv run uvicorn main:app --reload
 
 Open `http://127.0.0.1:8000`.
 
+### Docker run
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- OpenGround API/UI: `http://127.0.0.1:8000`
+- Postgres archive: `127.0.0.1:5433` (db `openground_dev`, user/password `openground` / `openground`)
+
+The app uses `OPENGROUND_DATABASE_URL` in `docker-compose.yml`, so table
+`openground_telemetry` is auto-created at startup when Postgres is healthy.
+
 ### Telemetry modes
 
 - `sim` (default) with `OPENGROUND_SCENARIO`: `nominal`, `sport`, `gentle`, `stress`

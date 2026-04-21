@@ -28,6 +28,9 @@ def create_health_router(runtime: GroundStationRuntime) -> APIRouter:
             "last_epoch_ms": lp.get("epoch_ms") if lp else None,
             "sequence_count": runtime.sequence_count,
             "server_time_ms": int(time.time() * 1000),
+            "telemetry_archive": "postgres"
+            if runtime.telemetry_store is not None
+            else "memory",
         }
 
     return router
