@@ -1,28 +1,8 @@
 (function () {
   const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-  const channels = [
-    "altitude",
-    "velocity",
-    "temperature",
-    "battery",
-    "lat",
-    "lon",
-    "met_phase_index",
-    "accel_proxy_mps2",
-    "iss_footprint_km",
-  ];
-  const channelIds = channels.map((key) => ({ namespace: "openground", key }));
-  const unitsByChannel = {
-    altitude: "m",
-    velocity: "m/s",
-    temperature: "degC",
-    battery: "%",
-    lat: "deg",
-    lon: "deg",
-    met_phase_index: "",
-    accel_proxy_mps2: "m/s²",
-    iss_footprint_km: "km",
-  };
+  let channels = [];
+  const unitsByChannel = {};
+  const labelByChannel = {};
 
   const UI = {
     card: "padding:12px;border:1px solid rgba(255,255,255,0.1);border-radius:2px;background:rgba(8,12,18,0.85)",
@@ -36,7 +16,7 @@
     wrap: "padding:16px;max-width:560px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
   };
 
-  const latestByChannel = Object.fromEntries(channels.map((c) => [c, null]));
+  let latestByChannel = {};
   let latestFullPacket = null;
   const subscribers = new Map();
   const statusListeners = new Set();
@@ -50,6 +30,33 @@
   const ONE_HOUR = THIRTY_MINUTES * 2;
   const TWO_HOURS = ONE_HOUR * 2;
   const ONE_DAY = ONE_HOUR * 24;
+
+  function titleCase(key) {
+    return String(key)
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
+  function guessUnits(channel) {
+    if (channel.includes("temp")) return "degC";
+    if (channel.includes("battery") || channel.endsWith("_pct")) return "%";
+    if (channel === "lat" || channel === "lon" || channel.endsWith("_deg")) return "deg";
+    if (channel.includes("velocity") || channel.endsWith("_mps")) return "m/s";
+    if (channel.includes("altitude") || channel.endsWith("_m")) return "m";
+    if (channel.endsWith("_km")) return "km";
+    return "";
+  }
+
+  function setChannels(keys) {
+    channels = Array.from(new Set((keys || []).filter((k) => typeof k === "string"))).sort();
+    latestByChannel = Object.fromEntries(channels.map((c) => [c, null]));
+    channels.forEach((c) => {
+      unitsByChannel[c] = guessUnits(c);
+      labelByChannel[c] = titleCase(c);
+    });
+  }
 
   function ensureChannelSet(channel) {
     if (!subscribers.has(channel)) {
@@ -128,6 +135,10 @@
     }
   }, 25000);
 
+  function channelIds() {
+    return channels.map((key) => ({ namespace: "openground", key }));
+  }
+
   function installOpenGroundPlugins() {
     openmct.types.addType("openground.telemetry", {
       name: "OpenGround Telemetry",
@@ -160,14 +171,7 @@
         name: "Flight deck (quick picks)",
         type: "folder",
         location: "openground:root",
-        composition: [
-          { namespace: "openground", key: "altitude" },
-          { namespace: "openground", key: "velocity" },
-          { namespace: "openground", key: "lat" },
-          { namespace: "openground", key: "lon" },
-          { namespace: "openground", key: "temperature" },
-          { namespace: "openground", key: "battery" },
-        ],
+        composition: channelIds().slice(0, 6),
       },
       "openground:missionStatus": {
         identifier: { namespace: "openground", key: "missionStatus" },
@@ -180,14 +184,14 @@
         name: "Telemetry Channels",
         type: "folder",
         location: "openground:root",
-        composition: channelIds,
+        composition: channelIds(),
       },
       "openground:missionTable": {
         identifier: { namespace: "openground", key: "missionTable" },
         name: "Mission Telemetry Table",
         type: "table",
         location: "openground:root",
-        composition: channelIds,
+        composition: channelIds(),
         configuration: {
           filters: {},
           globalFilters: [],
@@ -198,7 +202,7 @@
         name: "Mission LAD Table",
         type: "LadTable",
         location: "openground:root",
-        composition: channelIds,
+        composition: channelIds(),
         configuration: {
           filters: {},
           globalFilters: [],
@@ -214,24 +218,13 @@
     }
 
     channels.forEach((key) => {
-      const labels = {
-        altitude: "Altitude",
-        velocity: "Velocity",
-        temperature: "Temperature",
-        battery: "Battery",
-        lat: "Latitude",
-        lon: "Longitude",
-        met_phase_index: "Phase index (replay)",
-        accel_proxy_mps2: "Accel proxy (replay)",
-        iss_footprint_km: "ISS footprint",
-      };
       objects[`openground:${key}`] = {
         identifier: { namespace: "openground", key },
-        name: labels[key] || key,
+        name: labelByChannel[key] || key,
         type: "openground.telemetry",
         location: "openground:channels",
         telemetry: {
-          values: telemetryValueMeta(labels[key] || key, unitsByChannel[key] || ""),
+          values: telemetryValueMeta(labelByChannel[key] || key, unitsByChannel[key] || ""),
         },
       };
     });
@@ -316,11 +309,9 @@
           const channel = domainObject.identifier.key;
           const u = unitsByChannel[channel] || "";
           let decimals = 2;
-          if (channel === "lat" || channel === "lon") {
+          if (channel === "lat" || channel === "lon" || channel.endsWith("_deg")) {
             decimals = 6;
-          } else if (channel === "iss_footprint_km") {
-            decimals = 2;
-          } else if (channel === "met_phase_index" || channel === "accel_proxy_mps2") {
+          } else if (channel.endsWith("_phase_index") || channel.includes("accel_proxy")) {
             decimals = 4;
           }
           valueNode.textContent = `${Number(datum.value).toFixed(decimals)} ${u}`.trim();
@@ -519,7 +510,17 @@
     });
   }
 
-  function bootstrap() {
+  async function bootstrap() {
+    try {
+      const res = await fetch("/api/openmct/telemetry/schema");
+      const payload = await res.json();
+      const schemaChannels = Array.isArray(payload.channels) ? payload.channels : [];
+      setChannels(schemaChannels);
+    } catch (e) {
+      console.warn("[OpenGround] Failed to load telemetry schema; using empty channel list", e);
+      setChannels([]);
+    }
+
     openmct.setAssetPath("/openmct");
 
     openmct.install(openmct.plugins.LocalStorage());

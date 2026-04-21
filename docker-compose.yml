@@ -1,0 +1,36 @@
+services:
+  openground:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openground:latest
+    container_name: openground
+    ports:
+      - "8000:8000"
+    environment:
+      OPENGROUND_DATABASE_URL: postgres://openground:openground@postgres:5432/openground_dev?sslmode=disable
+      OPENGROUND_LOG_LEVEL: INFO
+      OPENGROUND_TELEMETRY_MODE: sim
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: openground-postgres
+    environment:
+      POSTGRES_USER: openground
+      POSTGRES_PASSWORD: openground
+      POSTGRES_DB: openground_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - openground_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openground -d openground_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  openground_pgdata:

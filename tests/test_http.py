@@ -28,3 +28,10 @@ def test_openmct_latest() -> None:
     r = client.get("/api/openmct/telemetry/latest")
     assert r.status_code == 200
     assert "data" in r.json()
+
+
+def test_openmct_history_accepts_float_bounds() -> None:
+    client = TestClient(app)
+    r = client.get("/api/openmct/telemetry/history", params={"start": 1.5, "end": 10.5})
+    assert r.status_code == 200
+    assert "data" in r.json()

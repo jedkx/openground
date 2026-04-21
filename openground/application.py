@@ -13,7 +13,9 @@ from fastapi.staticfiles import StaticFiles
 from openground.config import load_settings
 from openground.core.runtime import GroundStationRuntime
 from openground.logging_config import configure_logging
+from openground.routers.envelope_adapter import create_envelope_adapter_router
 from openground.routers.health import create_health_router
+from openground.routers.ingest import create_ingest_router
 from openground.routers.openmct_api import create_openmct_router
 from openground.routers.websocket import register_websocket
 
@@ -59,6 +61,9 @@ def create_app() -> FastAPI:
 
     app.include_router(create_health_router(runtime))
     app.include_router(create_openmct_router(runtime))
+    if settings.ingest_enabled:
+        app.include_router(create_ingest_router(runtime, settings))
+        app.include_router(create_envelope_adapter_router(runtime, settings))
     register_websocket(app, runtime)
 
     return app
