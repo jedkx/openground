@@ -1,5 +1,3 @@
-"""Generic event-envelope to core-ingest mapping helpers."""
-
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -23,13 +21,7 @@ def _as_string(value: Any, field: str, *, required: bool = False) -> str | None:
 def envelope_to_ingest_mode(payload: dict[str, Any]) -> Literal["normalized", "packet"]:
     if "packet_base64" in payload:
         return "packet"
-    required = ("altitude", "velocity", "temperature", "battery", "lat", "lon")
-    if all(k in payload for k in required):
-        return "normalized"
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="payload must contain telemetry scalars or packet_base64",
-    )
+    return "normalized"
 
 
 def envelope_identifiers(body: dict[str, Any]) -> tuple[str, str]:
@@ -43,12 +35,8 @@ def envelope_identifiers(body: dict[str, Any]) -> tuple[str, str]:
     return external_id, event_type
 
 
-def envelope_meta(external_event_id: str, event_type: str, source_hint: str | None) -> dict[str, Any]:
-    meta: dict[str, Any] = {
-        "kind": "event_envelope",
-        "external_event_id": external_event_id,
-        "external_event_type": event_type,
-    }
+def envelope_meta(external_id: str, event_type: str, source_hint: str | None) -> dict[str, Any]:
+    meta: dict[str, Any] = {"kind": "event_envelope", "external_event_id": external_id, "external_event_type": event_type}
     if source_hint:
         meta["source"] = source_hint
     return meta

@@ -1,0 +1,24 @@
+# OpenGround mission configuration.
+# Send any data: POST /api/missions/{id}/ingest/telemetry
+# Body: {"temperature": 52.3, "ram_usage": 78.1, "status": "ok"}
+
+[[missions]]
+id   = "raspberry-pi"
+name = "Raspberry Pi"
+
+[missions.adapter]
+type  = "http_ingest"
+token = "change-me"
+
+# Optional: declare channels to get limit violation alerts.
+# Any channel not declared here passes through without checks.
+[[missions.channels]]
+id    = "temperature"
+unit  = "°C"
+max   = 80.0
+
+[[missions.channels]]
+id    = "ram_usage"
+unit  = "%"
+min   = 0.0
+max   = 100.0

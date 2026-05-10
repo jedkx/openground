@@ -1,5 +1,3 @@
-"""Ground-side link and vehicle health state (not flight software)."""
-
 from __future__ import annotations
 
 import logging
@@ -13,13 +11,10 @@ class SystemState(StrEnum):
     BOOT = "BOOT"
     CONNECTING = "CONNECTING"
     NOMINAL = "NOMINAL"
-    DEGRADED = "DEGRADED"
     LOST = "LOST"
 
 
 class StateMachine:
-    """Models operator-visible comms and coarse vehicle constraints."""
-
     def __init__(self, lost_timeout_seconds: float) -> None:
         self.state: SystemState = SystemState.BOOT
         self.lost_timeout_seconds = lost_timeout_seconds
@@ -36,49 +31,28 @@ class StateMachine:
 
     def on_client_disconnected(self, total_clients: int) -> None:
         self.client_count = max(total_clients, 0)
-        if self.client_count == 0:
-            if self.disconnected_since is None:
-                self.disconnected_since = time.time()
-            log.info("All ground clients disconnected; LOST timer armed")
+        if self.client_count == 0 and self.disconnected_since is None:
+            self.disconnected_since = time.time()
+            log.info("All clients disconnected; LOST timer armed")
 
-    def on_packet_sent(self, telemetry: dict) -> None:
+    def on_packet_received(self) -> None:
         self.last_packet_time = time.time()
-
-        if self.client_count == 0:
-            return
-
-        battery = telemetry["battery"]
-        temperature = telemetry["temperature"]
-        degraded = battery < 20 or temperature > 80
-
-        prev = self.state
         if self.state in (SystemState.BOOT, SystemState.CONNECTING, SystemState.LOST):
-            self.state = SystemState.DEGRADED if degraded else SystemState.NOMINAL
-        elif self.state == SystemState.NOMINAL and degraded:
-            self.state = SystemState.DEGRADED
-        elif self.state == SystemState.DEGRADED and not degraded:
             self.state = SystemState.NOMINAL
-
-        if self.state != prev:
-            log.info("System state %s -> %s", prev.value, self.state.value)
+            log.info("System state -> NOMINAL")
 
     def check_timeout(self) -> None:
         now = time.time()
+
         dc = self.disconnected_since
         if dc is not None and (now - dc) > self.lost_timeout_seconds:
             if self.state != SystemState.LOST:
-                log.warning(
-                    "Link LOST: no ground clients within %.1f s",
-                    self.lost_timeout_seconds,
-                )
+                log.warning("Link LOST: no clients within %.1f s", self.lost_timeout_seconds)
             self.state = SystemState.LOST
             return
 
         lpt = self.last_packet_time
         if lpt is not None and (now - lpt) > self.lost_timeout_seconds:
             if self.state != SystemState.LOST:
-                log.warning(
-                    "Link LOST: no telemetry within %.1f s",
-                    self.lost_timeout_seconds,
-                )
+                log.warning("Link LOST: no data within %.1f s", self.lost_timeout_seconds)
             self.state = SystemState.LOST

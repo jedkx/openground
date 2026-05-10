@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from main import app
+
+from openground.application import create_app
 
 
 def test_health() -> None:
-    client = TestClient(app)
+    client = TestClient(create_app())
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
 
 def test_status_shape() -> None:
-    client = TestClient(app)
+    client = TestClient(create_app())
     r = client.get("/api/v1/status")
     assert r.status_code == 200
     body = r.json()
@@ -24,14 +25,14 @@ def test_status_shape() -> None:
 
 
 def test_openmct_latest() -> None:
-    client = TestClient(app)
+    client = TestClient(create_app())
     r = client.get("/api/openmct/telemetry/latest")
     assert r.status_code == 200
     assert "data" in r.json()
 
 
 def test_openmct_history_accepts_float_bounds() -> None:
-    client = TestClient(app)
+    client = TestClient(create_app())
     r = client.get("/api/openmct/telemetry/history", params={"start": 1.5, "end": 10.5})
     assert r.status_code == 200
     assert "data" in r.json()

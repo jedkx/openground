@@ -1,6 +1,8 @@
-"""Sequence count gap detection on the CCSDS primary header (14-bit counter)."""
-
 from __future__ import annotations
+
+from openground.ccsds import SEQ_MASK
+
+_HALF = SEQ_MASK // 2  # gaps >= half the counter space are treated as wrap-around, not loss
 
 
 class SequenceMonitor:
@@ -11,11 +13,11 @@ class SequenceMonitor:
 
     def observe(self, seq: int) -> dict:
         if self.expected_seq is not None:
-            gap = (seq - self.expected_seq) & 0x3FFF
-            if 0 < gap < 8192:
+            gap = (seq - self.expected_seq) & SEQ_MASK
+            if 0 < gap < _HALF:
                 self.lost_packets += gap
 
-        self.expected_seq = (seq + 1) & 0x3FFF
+        self.expected_seq = (seq + 1) & SEQ_MASK
         self.received_packets += 1
 
         total = self.received_packets + self.lost_packets
