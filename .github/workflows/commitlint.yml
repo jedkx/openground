@@ -20,7 +20,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Lint commit messages
-        uses: wagoid/commitlint-action@v6
-        with:
-          configFile: .commitlintrc.yml
+      - name: Validate conventional commits
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|test|chore|ci|perf|revert)(\(.+\))!?: .{1,100}$'
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          failed=0
+          while IFS= read -r msg; do
+            if ! echo "$msg" | grep -qP "$pattern"; then
+              echo "::error::Invalid commit message: \"$msg\""
+              failed=1
+            fi
+          done < <(git log "$base..$head" --format=%s)
+          exit $failed
