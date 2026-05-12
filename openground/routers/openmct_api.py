@@ -16,9 +16,10 @@ def create_openmct_router(registry: MissionRegistry) -> APIRouter:
         return default if value is None else int(value)
 
     def _numeric_keys(envelope: dict) -> list[str]:
-        excluded = {"epoch_ms", "mission_start_epoch_ms", "met_ms"}
+        excluded = {"epoch_ms"}
         return sorted(
-            k for k, v in envelope.items()
+            k
+            for k, v in envelope.items()
             if k not in excluded and isinstance(v, (int, float)) and not isinstance(v, bool)
         )
 
@@ -43,6 +44,42 @@ def create_openmct_router(registry: MissionRegistry) -> APIRouter:
                 detail=f"Mission {mission_id!r} not found",
             )
         return runtime
+
+    # Metadata: declared channel specs (unit, min, max, description)
+    @router.get("/api/openmct/telemetry/metadata")
+    async def telemetry_metadata() -> dict:
+        runtime = registry.get_default()
+        if runtime is None:
+            return {"channels": []}
+        return {
+            "channels": [
+                {
+                    "id": c.id,
+                    "unit": c.unit,
+                    "min": c.min_val,
+                    "max": c.max_val,
+                    "description": c.description,
+                }
+                for c in runtime.adapter.declared_channels()
+            ]
+        }
+
+    @router.get("/api/missions/{mission_id}/telemetry/metadata")
+    async def mission_metadata(mission_id: str) -> dict:
+        runtime = _get_or_404(mission_id)
+        return {
+            "mission_id": mission_id,
+            "channels": [
+                {
+                    "id": c.id,
+                    "unit": c.unit,
+                    "min": c.min_val,
+                    "max": c.max_val,
+                    "description": c.description,
+                }
+                for c in runtime.adapter.declared_channels()
+            ],
+        }
 
     # Legacy routes — keep existing frontend working
     @router.get("/api/openmct/telemetry/latest")

@@ -3,7 +3,11 @@ name: PR Check
 on:
   pull_request:
     branches:
+      - master
       - development
+  push:
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
@@ -28,12 +32,34 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Lint
-        run: make lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Test with coverage
-        run: make test-cov
+        run: uv run pytest -q --cov=openground --cov-report=xml --cov-report=term-missing
 
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t openground:ci .

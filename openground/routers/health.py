@@ -17,9 +17,9 @@ def create_health_router(registry: MissionRegistry) -> APIRouter:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @router.get("/api/v1/status")
+    @router.get("/api/status")
     async def ops_status() -> dict[str, Any]:
-        """Ground-side snapshot for the default mission (backward-compatible)."""
+        """Ground-side snapshot for the default mission."""
         runtime = registry.get_default()
         if runtime is None:
             return {"service": "openground", "missions": 0}
@@ -28,14 +28,14 @@ def create_health_router(registry: MissionRegistry) -> APIRouter:
             "service": "openground",
             "mission_id": runtime.mission_id,
             "websocket_clients": runtime.connections.client_count,
-            "system_state": latest.get("system_state", "BOOT"),
+            "system_state": latest.get("system_state"),
             "last_epoch_ms": latest.get("epoch_ms"),
-            "seq": latest.get("seq", -1),
+            "seq": latest.get("seq"),
             "server_time_ms": int(time.time() * 1000),
             "telemetry_archive": "postgres" if runtime.config.database_url else "memory",
         }
 
-    @router.get("/api/v1/missions")
+    @router.get("/api/missions")
     async def list_missions() -> dict[str, Any]:
         """List all active missions with their current state."""
         missions = []
@@ -47,15 +47,15 @@ def create_health_router(registry: MissionRegistry) -> APIRouter:
                     "id": runtime.mission_id,
                     "name": runtime.config.name,
                     "adapter": type(runtime.adapter).__name__,
-                    "ingest_mode": sim.get("ingest_mode", "unknown"),
+                    "ingest_mode": sim.get("ingest_mode"),
                     "websocket_clients": runtime.connections.client_count,
-                    "system_state": latest.get("system_state", "BOOT"),
+                    "system_state": latest.get("system_state"),
                     "last_epoch_ms": latest.get("epoch_ms"),
                 }
             )
         return {"missions": missions, "count": len(missions)}
 
-    @router.get("/api/v1/missions/{mission_id}/status")
+    @router.get("/api/missions/{mission_id}/status")
     async def mission_status(mission_id: str) -> dict[str, Any]:
         runtime = registry.get(mission_id)
         if runtime is None:
@@ -69,9 +69,9 @@ def create_health_router(registry: MissionRegistry) -> APIRouter:
             "mission_id": runtime.mission_id,
             "name": runtime.config.name,
             "adapter": type(runtime.adapter).__name__,
-            "ingest_mode": sim.get("ingest_mode", "unknown"),
+            "ingest_mode": sim.get("ingest_mode"),
             "websocket_clients": runtime.connections.client_count,
-            "system_state": latest.get("system_state", "BOOT"),
+            "system_state": latest.get("system_state"),
             "last_epoch_ms": latest.get("epoch_ms"),
             "server_time_ms": int(time.time() * 1000),
             "telemetry_archive": "postgres" if runtime.config.database_url else "memory",

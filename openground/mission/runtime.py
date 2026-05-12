@@ -11,8 +11,8 @@ from openground.pipeline.pipeline import FanoutPipeline
 from openground.pipeline.workers import BroadcastWorker
 from openground.sdk.adapter import TelemetryAdapter
 from openground.sdk.frame import EnrichedFrame
+from openground.sdk.store import TelemetryStore
 from openground.services.connection import ConnectionManager
-from openground.store.telemetry_postgres import TelemetryStore
 
 log = logging.getLogger(__name__)
 
@@ -22,17 +22,17 @@ class MissionRuntime:
         self,
         config: MissionConfig,
         adapter: TelemetryAdapter,
+        enricher: Enricher,
         pipeline: FanoutPipeline,
         broadcast_worker: BroadcastWorker,
         store: TelemetryStore | None = None,
     ) -> None:
         self._config = config
         self._adapter = adapter
+        self._enricher = enricher
         self._pipeline = pipeline
         self._broadcast_worker = broadcast_worker
         self._store = store
-        specs = {c.id: c for c in config.channels}
-        self._enricher = Enricher(config.id, config.lost_timeout_seconds, specs)
         self._latest: EnrichedFrame | None = None
         self._history: deque[EnrichedFrame] = deque(maxlen=config.history_maxlen)
         self._run_task: asyncio.Task[None] | None = None
@@ -70,9 +70,7 @@ class MissionRuntime:
         if start_ms is None or end_ms is None:
             return [f.envelope for f in self._history]
         return [
-            f.envelope
-            for f in self._history
-            if start_ms <= f.envelope.get("epoch_ms", 0) <= end_ms
+            f.envelope for f in self._history if start_ms <= f.envelope.get("epoch_ms", 0) <= end_ms
         ]
 
     def on_client_connected(self) -> None:
@@ -86,7 +84,8 @@ class MissionRuntime:
         await self._pipeline.start()
         self._run_task = asyncio.create_task(self._run(), name=f"mission-run-{self._config.id}")
         self._timeout_task = asyncio.create_task(
-            self._timeout_loop(), name=f"mission-timeout-{self._config.id}"
+            self._timeout_loop(),
+            name=f"mission-timeout-{self._config.id}",
         )
         log.info("Mission %r started (adapter=%s)", self._config.id, type(self._adapter).__name__)
 
@@ -107,7 +106,7 @@ class MissionRuntime:
     async def _run(self) -> None:
         try:
             async for frame in self._adapter.stream():
-                enriched = self._enricher.process(frame)
+                enriched = await self._enricher.process(frame)
                 self._latest = enriched
                 self._history.append(enriched)
                 await self._pipeline.publish(enriched)
@@ -118,6 +117,7 @@ class MissionRuntime:
             raise
 
     async def _timeout_loop(self) -> None:
+        interval = self._config.pipeline.timeout_check_interval_seconds
         while True:
             self._enricher.check_timeout()
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(interval)

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
 
 from openground.sdk.frame import EnrichedFrame
+from openground.sdk.store import TelemetryStore
 from openground.services.connection import ConnectionManager
 
 log = logging.getLogger(__name__)
@@ -14,8 +14,20 @@ class PipelineWorker(ABC):
     @abstractmethod
     async def handle(self, frame: EnrichedFrame) -> None: ...
 
-    async def start(self) -> None: ...
-    async def stop(self) -> None: ...
+    async def on_error(self, exc: Exception, frame: EnrichedFrame) -> None:
+        """Called when handle() raises. Default: log and drop."""
+        log.exception(
+            "Worker %s error (mission=%s seq=%d)",
+            type(self).__name__,
+            frame.frame.mission_id,
+            frame.frame.seq,
+        )
+
+    async def start(self) -> None:  # noqa: B027
+        """Override to acquire resources before the pipeline starts draining."""
+
+    async def stop(self) -> None:  # noqa: B027
+        """Override to release resources after the pipeline stops."""
 
 
 class BroadcastWorker(PipelineWorker):
@@ -27,15 +39,8 @@ class BroadcastWorker(PipelineWorker):
 
 
 class StorageWorker(PipelineWorker):
-    def __init__(self, store: Any) -> None:
+    def __init__(self, store: TelemetryStore) -> None:
         self._store = store
 
     async def handle(self, frame: EnrichedFrame) -> None:
-        try:
-            await self._store.insert_from_enriched(frame.envelope)
-        except Exception:
-            log.exception(
-                "Storage insert failed (mission=%s seq=%d)",
-                frame.frame.mission_id,
-                frame.frame.seq,
-            )
+        await self._store.insert_from_enriched(frame.envelope)

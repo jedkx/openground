@@ -12,6 +12,15 @@ TOML format::
     [missions.adapter]
     type  = "http_ingest"
     token = "secret"
+
+    # optional tuning
+    [missions.pipeline]
+    ingest_queue_maxsize = 500
+    worker_queue_maxsize = 1000
+
+    [missions.storage]
+    pool_min_size = 1
+    pool_max_size = 8
 """
 
 from __future__ import annotations
@@ -22,6 +31,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from openground.constants import (
+    DEFAULT_HISTORY_MAXLEN,
+    DEFAULT_INGEST_QUEUE_MAXSIZE,
+    DEFAULT_LOST_TIMEOUT_SECONDS,
+    DEFAULT_WORKER_QUEUE_MAXSIZE,
+)
 from openground.sdk.channel import ChannelSpec
 
 log = logging.getLogger(__name__)
@@ -38,7 +53,27 @@ class HttpIngestAdapterConfig:
     token: str = ""
 
 
-AdapterConfig = HttpIngestAdapterConfig
+AdapterConfig = HttpIngestAdapterConfig  # union as new adapters are added
+
+
+# ---------------------------------------------------------------------------
+# Pipeline + Storage tuning
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineConfig:
+    ingest_queue_maxsize: int = DEFAULT_INGEST_QUEUE_MAXSIZE
+    worker_queue_maxsize: int = DEFAULT_WORKER_QUEUE_MAXSIZE
+    timeout_check_interval_seconds: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class StorageConfig:
+    pool_min_size: int = 1
+    pool_max_size: int = 8
+    query_default_limit: int = 50_000
+    query_max_limit: int = 200_000
 
 
 # ---------------------------------------------------------------------------
@@ -52,9 +87,11 @@ class MissionConfig:
     name: str
     adapter: AdapterConfig
     channels: tuple[ChannelSpec, ...] = field(default_factory=tuple)
-    history_maxlen: int = 5_000
-    lost_timeout_seconds: float = 5.0
+    history_maxlen: int = DEFAULT_HISTORY_MAXLEN
+    lost_timeout_seconds: float = DEFAULT_LOST_TIMEOUT_SECONDS
     database_url: str = ""
+    pipeline: PipelineConfig = field(default_factory=PipelineConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -63,16 +100,44 @@ class MissionConfig:
 
 
 def _parse_adapter(raw: dict[str, Any]) -> AdapterConfig:
-    return HttpIngestAdapterConfig(token=str(raw.get("token", "")))
+    adapter_type = str(raw.get("type", "http_ingest"))
+    if adapter_type == "http_ingest":
+        return HttpIngestAdapterConfig(token=str(raw.get("token", "")))
+    raise ValueError(f"Unknown adapter type {adapter_type!r} — supported: http_ingest")
 
 
 def _parse_channel(raw: dict[str, Any]) -> ChannelSpec:
+    # Parse severity and rules if present
+    severity = str(raw.get("severity", "warning"))
+    rules = tuple(raw.get("rules", ()))
+    # Accept comma-separated string for rules as well
+    if isinstance(rules, str):
+        rules = tuple(r.strip() for r in rules.split(",") if r.strip())
     return ChannelSpec(
         id=str(raw["id"]),
         unit=str(raw.get("unit", "")),
         min_val=float(raw["min"]) if "min" in raw else None,
         max_val=float(raw["max"]) if "max" in raw else None,
         description=str(raw.get("description", "")),
+        severity=severity,
+        rules=rules,
+    )
+
+
+def _parse_pipeline(raw: dict[str, Any]) -> PipelineConfig:
+    return PipelineConfig(
+        ingest_queue_maxsize=int(raw.get("ingest_queue_maxsize", DEFAULT_INGEST_QUEUE_MAXSIZE)),
+        worker_queue_maxsize=int(raw.get("worker_queue_maxsize", DEFAULT_WORKER_QUEUE_MAXSIZE)),
+        timeout_check_interval_seconds=float(raw.get("timeout_check_interval_seconds", 1.0)),
+    )
+
+
+def _parse_storage(raw: dict[str, Any]) -> StorageConfig:
+    return StorageConfig(
+        pool_min_size=int(raw.get("pool_min_size", 1)),
+        pool_max_size=int(raw.get("pool_max_size", 8)),
+        query_default_limit=int(raw.get("query_default_limit", 50_000)),
+        query_max_limit=int(raw.get("query_max_limit", 200_000)),
     )
 
 
@@ -89,6 +154,8 @@ def _parse_mission(raw: dict[str, Any]) -> MissionConfig:
         history_maxlen=int(raw.get("history_maxlen", 5_000)),
         lost_timeout_seconds=float(raw.get("lost_timeout_seconds", 5.0)),
         database_url=str(raw.get("database_url", "")),
+        pipeline=_parse_pipeline(raw.get("pipeline", {})),
+        storage=_parse_storage(raw.get("storage", {})),
     )
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-
 from openground.application import create_app
 
 
@@ -15,8 +14,8 @@ def test_health() -> None:
 
 
 def test_status_shape() -> None:
-    client = TestClient(create_app())
-    r = client.get("/api/v1/status")
+    with TestClient(create_app()) as client:
+        r = client.get("/api/status")
     assert r.status_code == 200
     body = r.json()
     assert body["service"] == "openground"

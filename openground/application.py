@@ -20,7 +20,8 @@ from openground.routers.health import create_health_router
 from openground.routers.ingest import create_ingest_router
 from openground.routers.openmct_api import create_openmct_router
 from openground.routers.websocket import register_websocket
-from openground.store.telemetry_postgres import TelemetryStore
+from openground.sdk.store import TelemetryStore
+from openground.store.telemetry_postgres import PostgresTelemetryStore
 
 log = logging.getLogger(__name__)
 
@@ -53,16 +54,16 @@ def create_app() -> FastAPI:
     registry = MissionRegistry()
     _stores: dict[str, TelemetryStore] = {}
 
-    async def _get_or_create_store(dsn: str) -> TelemetryStore:
+    async def _get_or_create_store(dsn: str, mc: MissionConfig) -> TelemetryStore:
         if dsn not in _stores:
-            _stores[dsn] = await TelemetryStore.connect(dsn)
+            _stores[dsn] = await PostgresTelemetryStore.connect(dsn, storage_config=mc.storage)
         return _stores[dsn]
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         for mc in mission_configs:
             dsn = mc.database_url or global_db_url
-            store = await _get_or_create_store(dsn) if dsn else None
+            store = await _get_or_create_store(dsn, mc) if dsn else None
             runtime = build_mission_runtime(mc, store=store)
             registry.register(runtime)
 

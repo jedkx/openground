@@ -8,10 +8,14 @@ from fastapi import HTTPException, status
 def _as_string(value: Any, field: str, *, required: bool = False) -> str | None:
     if value is None:
         if required:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required"
+            )
         return None
     if not isinstance(value, str):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} must be a string")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} must be a string"
+        )
     s = value.strip()
     if required and not s:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
@@ -36,7 +40,11 @@ def envelope_identifiers(body: dict[str, Any]) -> tuple[str, str]:
 
 
 def envelope_meta(external_id: str, event_type: str, source_hint: str | None) -> dict[str, Any]:
-    meta: dict[str, Any] = {"kind": "event_envelope", "external_event_id": external_id, "external_event_type": event_type}
+    meta: dict[str, Any] = {
+        "kind": "event_envelope",
+        "external_event_id": external_id,
+        "external_event_type": event_type,
+    }
     if source_hint:
         meta["source"] = source_hint
     return meta

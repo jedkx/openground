@@ -1,8 +1,6 @@
 """Adapter endpoints for generic event envelopes.
 
 Converts external wrapper payloads into OpenGround's ingest pipeline.
-Supports the legacy ``/api/v1/adapters/envelope`` (default mission) and the
-new ``/api/missions/{id}/adapters/envelope`` (per-mission).
 """
 
 from __future__ import annotations
@@ -83,12 +81,6 @@ def create_envelope_adapter_router(registry: MissionRegistry) -> APIRouter:
             )
         return runtime.adapter
 
-    # Legacy route
-    @router.post("/api/v1/adapters/envelope", status_code=status.HTTP_202_ACCEPTED)
-    async def post_envelope_legacy(body: EventEnvelope, request: Request) -> dict[str, str]:
-        return await _dispatch(_get_adapter(None), body, request)
-
-    # Per-mission route
     @router.post(
         "/api/missions/{mission_id}/adapters/envelope",
         status_code=status.HTTP_202_ACCEPTED,

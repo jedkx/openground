@@ -16,6 +16,7 @@
     wrap: "padding:16px;max-width:560px;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
   };
 
+  let channelMeta = {};   // { [channel_id]: {unit, min, max, description} }
   let latestByChannel = {};
   let latestFullPacket = null;
   const subscribers = new Map();
@@ -39,22 +40,13 @@
       .replace(/\b\w/g, (m) => m.toUpperCase());
   }
 
-  function guessUnits(channel) {
-    if (channel.includes("temp")) return "degC";
-    if (channel.includes("battery") || channel.endsWith("_pct")) return "%";
-    if (channel === "lat" || channel === "lon" || channel.endsWith("_deg")) return "deg";
-    if (channel.includes("velocity") || channel.endsWith("_mps")) return "m/s";
-    if (channel.includes("altitude") || channel.endsWith("_m")) return "m";
-    if (channel.endsWith("_km")) return "km";
-    return "";
-  }
-
   function setChannels(keys) {
     channels = Array.from(new Set((keys || []).filter((k) => typeof k === "string"))).sort();
     latestByChannel = Object.fromEntries(channels.map((c) => [c, null]));
     channels.forEach((c) => {
-      unitsByChannel[c] = guessUnits(c);
-      labelByChannel[c] = titleCase(c);
+      const meta = channelMeta[c];
+      unitsByChannel[c] = (meta && meta.unit) || "";
+      labelByChannel[c] = (meta && meta.description) || titleCase(c);
     });
   }
 
@@ -141,91 +133,126 @@
 
   function installOpenGroundPlugins() {
     openmct.types.addType("openground.telemetry", {
-      name: "OpenGround Telemetry",
-      description: "Scalar telemetry channel (WebSocket stream, REST history)",
+      name: "Telemetry Channel",
+      description: "Scalar telemetry channel — real-time WebSocket stream with REST history.",
       cssClass: "icon-telemetry",
     });
 
     openmct.types.addType("openground.mission", {
-      name: "OpenGround Mission Summary",
-      description: "MET, simulation profile, flight phase, link state, CCSDS, flight rules, plausibility faults",
+      name: "Mission Status",
+      description: "Link state, sequence stats, and limit violations for a mission.",
       cssClass: "icon-info",
     });
 
-    const objects = {
-      "openground:root": {
-        identifier: { namespace: "openground", key: "root" },
-        name: "OpenGround",
-        type: "folder",
-        location: "ROOT",
-        composition: [
-          { namespace: "openground", key: "flightDeck" },
-          { namespace: "openground", key: "missionStatus" },
-          { namespace: "openground", key: "missionTable" },
-          { namespace: "openground", key: "missionLad" },
-          { namespace: "openground", key: "channels" },
-        ],
-      },
-      "openground:flightDeck": {
-        identifier: { namespace: "openground", key: "flightDeck" },
-        name: "Flight deck (quick picks)",
-        type: "folder",
-        location: "openground:root",
-        composition: channelIds().slice(0, 6),
-      },
-      "openground:missionStatus": {
-        identifier: { namespace: "openground", key: "missionStatus" },
-        name: "Mission Summary",
-        type: "openground.mission",
-        location: "openground:root",
-      },
-      "openground:channels": {
-        identifier: { namespace: "openground", key: "channels" },
-        name: "Telemetry Channels",
-        type: "folder",
-        location: "openground:root",
-        composition: channelIds(),
-      },
-      "openground:missionTable": {
-        identifier: { namespace: "openground", key: "missionTable" },
-        name: "Mission Telemetry Table",
-        type: "table",
-        location: "openground:root",
-        composition: channelIds(),
-        configuration: {
-          filters: {},
-          globalFilters: [],
-        },
-      },
-      "openground:missionLad": {
-        identifier: { namespace: "openground", key: "missionLad" },
-        name: "Mission LAD Table",
-        type: "LadTable",
-        location: "openground:root",
-        composition: channelIds(),
-        configuration: {
-          filters: {},
-          globalFilters: [],
-        },
-      },
-    };
+    // Merge declared channels (metadata) with any live channels not yet declared.
+    // This way the UI is populated even before the first packet arrives.
+    const declaredKeys = Object.keys(channelMeta);
+    const allChannelKeys = [
+      ...declaredKeys,
+      ...channels.filter((k) => !channelMeta[k]),
+    ];
 
-    function telemetryValueMeta(name, units) {
+    function ref(key) {
+      return { namespace: "openground", key };
+    }
+
+    function telemetryValueMeta(name, unit) {
       return [
         { key: "utc", name: "Time", format: "utc", hints: { domain: 1 } },
-        { key: "value", name, format: "float", units, hints: { range: 1 } },
+        { key: "value", name, format: "float", units: unit, hints: { range: 1 } },
       ];
     }
 
-    channels.forEach((key) => {
+    // Group channels by unit to build one stacked plot per unit family.
+    const unitGroups = {};
+    allChannelKeys.forEach((k) => {
+      const unit = (channelMeta[k] && channelMeta[k].unit) || "";
+      if (!unitGroups[unit]) unitGroups[unit] = [];
+      unitGroups[unit].push(k);
+    });
+
+    const objects = {};
+
+    // One stacked plot per unit group, parented under overview.
+    const overviewPlots = [];
+    Object.entries(unitGroups).forEach(([unit, keys]) => {
+      const plotKey = "plot-" + (unit || "misc").replace(/[^a-zA-Z0-9]/g, "_");
+      const plotName = unit || "Other";
+      objects[`openground:${plotKey}`] = {
+        identifier: ref(plotKey),
+        name: plotName,
+        type: "telemetry.plot.stacked",
+        location: "openground:overview",
+        composition: keys.map(ref),
+      };
+      overviewPlots.push(ref(plotKey));
+    });
+
+    objects["openground:root"] = {
+      identifier: ref("root"),
+      name: "OpenGround",
+      type: "folder",
+      location: "ROOT",
+      composition: [
+        ref("overview"),
+        ref("lad"),
+        ref("table"),
+        ref("channels"),
+      ],
+    };
+
+    objects["openground:overview"] = {
+      identifier: ref("overview"),
+      name: "Overview",
+      type: "folder",
+      location: "openground:root",
+      // Mission Status first, then one plot per unit group.
+      composition: [ref("missionStatus"), ...overviewPlots],
+    };
+
+    objects["openground:missionStatus"] = {
+      identifier: ref("missionStatus"),
+      name: "Mission Status",
+      type: "openground.mission",
+      location: "openground:overview",
+    };
+
+    objects["openground:channels"] = {
+      identifier: ref("channels"),
+      name: "Channels",
+      type: "folder",
+      location: "openground:root",
+      composition: allChannelKeys.map(ref),
+    };
+
+    objects["openground:table"] = {
+      identifier: ref("table"),
+      name: "Telemetry Table",
+      type: "table",
+      location: "openground:root",
+      composition: allChannelKeys.map(ref),
+      configuration: { filters: {}, globalFilters: [] },
+    };
+
+    objects["openground:lad"] = {
+      identifier: ref("lad"),
+      name: "Last Known Values",
+      type: "LadTable",
+      location: "openground:root",
+      composition: allChannelKeys.map(ref),
+      configuration: { filters: {}, globalFilters: [] },
+    };
+
+    allChannelKeys.forEach((key) => {
+      const meta = channelMeta[key] || {};
+      const label = meta.description || labelByChannel[key] || key;
+      const unit = meta.unit || unitsByChannel[key] || "";
       objects[`openground:${key}`] = {
-        identifier: { namespace: "openground", key },
-        name: labelByChannel[key] || key,
+        identifier: ref(key),
+        name: label,
         type: "openground.telemetry",
         location: "openground:channels",
-        telemetry: {
-          values: telemetryValueMeta(labelByChannel[key] || key, unitsByChannel[key] || ""),
-        },
+        telemetry: { values: telemetryValueMeta(label, unit) },
       };
     });
 
@@ -308,13 +335,7 @@
 
           const channel = domainObject.identifier.key;
           const u = unitsByChannel[channel] || "";
-          let decimals = 2;
-          if (channel === "lat" || channel === "lon" || channel.endsWith("_deg")) {
-            decimals = 6;
-          } else if (channel.endsWith("_phase_index") || channel.includes("accel_proxy")) {
-            decimals = 4;
-          }
-          valueNode.textContent = `${Number(datum.value).toFixed(decimals)} ${u}`.trim();
+          valueNode.textContent = `${Number(datum.value).toFixed(2)} ${u}`.trim();
           timeNode.textContent = new Date(datum.utc).toISOString().slice(11, 19) + "Z";
         }
 
@@ -388,100 +409,50 @@
             elementRef.innerHTML = `<div style="${UI.wrap}"><p style="${UI.muted}">Awaiting telemetry…</p></div>`;
             return;
           }
-          const faults = Array.isArray(packet.faults) ? packet.faults : [];
-          const faultBlock =
-            faults.length === 0
-              ? `<p style="${UI.ok}">No plausibility faults.</p>`
-              : `<ul style="${UI.critList}">${faults.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>`;
-          const rules = Array.isArray(packet.flight_rules) ? packet.flight_rules : [];
-          const sevColor = (sev) => {
-            const u = String(sev || "").toUpperCase();
-            if (u === "CRITICAL") return "#e07070";
-            if (u === "WARNING") return "#d9a060";
-            return "rgba(200,210,222,0.85)";
-          };
-          const rulesBlock =
-            rules.length === 0
-              ? `<p style="${UI.ok}">No flight-rule violations.</p>`
-              : `<ul style="margin:6px 0 0 0;padding-left:18px;">${rules
-                  .map(
-                    (r) =>
-                      `<li style="color:${sevColor(r.severity)}"><span style="font-weight:600">${esc(r.id)}</span> — ${esc(r.message)}</li>`
-                  )
-                  .join("")}</ul>`;
-          const metStr =
-            typeof packet.met_hhmmss === "string" ? esc(packet.met_hhmmss) : "—";
-          const metMs = typeof packet.met_ms === "number" ? esc(packet.met_ms) : "—";
-          const sim = packet.sim || {};
-          const modeStr = sim.telemetry_mode != null ? esc(sim.telemetry_mode) : "sim";
-          const simLine = [
-            `mode ${modeStr}`,
-            sim.profile != null ? `<span style="font-weight:600">${esc(sim.profile)}</span>` : "",
-            sim.dt_s != null ? `dt ${esc(sim.dt_s)} s` : "",
-            sim.thrust_n != null && sim.thrust_n !== "" ? `${esc(sim.thrust_n)} N` : "",
-            sim.mass_kg != null && sim.mass_kg !== "" ? `${esc(sim.mass_kg)} kg` : "",
-            sim.timeline_path != null && sim.timeline_path !== "" ? `timeline ${esc(sim.timeline_path)}` : "",
-            sim.iss_api_url != null && sim.iss_api_url !== "" ? `ISS ${esc(sim.iss_api_url)}` : "",
-            sim.note != null && sim.note !== "" ? esc(sim.note) : "",
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          const missionEvent =
-            typeof packet.mission_event === "string" && packet.mission_event.trim()
-              ? esc(packet.mission_event.trim())
-              : "—";
-          const issVisBlock =
-            typeof packet.iss_visibility === "string" && packet.iss_visibility.trim()
-              ? `<div style="${UI.card}">
-                <div style="${UI.label}">ISS visibility (API)</div>
-                <div style="${UI.value}">${esc(packet.iss_visibility.trim())}</div>
-              </div>`
-              : "";
+
           const c = packet.ccsds || {};
-          const apidHex =
-            c.apid != null && c.apid !== ""
-              ? `0x${Number(c.apid).toString(16).padStart(3, "0")}`
-              : "—";
-          const seqStr = c.seq != null ? esc(c.seq) : "—";
-          const sizeStr = c.size != null ? esc(c.size) : "—";
-          const lossStr = c.loss_rate != null ? esc(c.loss_rate) : "—";
+          const apidHex = c.apid != null ? `0x${Number(c.apid).toString(16).padStart(3, "0")}` : "—";
+          const lossStr = c.loss_rate != null ? `${esc(c.loss_rate)}%` : "—";
+
+          const violations = Array.isArray(packet.limit_violations) ? packet.limit_violations : [];
+          const violationsBlock =
+            violations.length === 0
+              ? `<p style="${UI.ok}">All channels within limits.</p>`
+              : `<ul style="${UI.critList}">${violations
+                  .map((v) => {
+                    const bound = v.max != null ? `max ${v.max}` : `min ${v.min}`;
+                    return `<li>${esc(v.channel)}: ${esc(v.value)} (${bound})</li>`;
+                  })
+                  .join("")}</ul>`;
+
           elementRef.innerHTML = `
           <div style="${UI.wrap};color:#e8eef8;">
-            <h2 style="margin:0 0 14px 0;font-size:16px;font-weight:600;letter-spacing:0.03em">Mission Summary</h2>
+            <h2 style="margin:0 0 14px 0;font-size:16px;font-weight:600;letter-spacing:0.03em">Mission Status</h2>
             <div style="display:grid;gap:10px;">
               <div style="${UI.card}">
-                <div style="${UI.label}">Mission elapsed time</div>
-                <div style="${UI.valueLg}">T+ ${metStr}</div>
-                <div style="${UI.muted};margin-top:4px">${metMs} ms since T0</div>
+                <div style="${UI.label}">Mission</div>
+                <div style="${UI.value}">${esc(packet.mission_id)}</div>
               </div>
               <div style="${UI.card}">
-                <div style="${UI.label}">Event / caption</div>
-                <div style="${UI.value}">${missionEvent}</div>
-              </div>
-              ${issVisBlock}
-              <div style="${UI.card}">
-                <div style="${UI.label}">Telemetry mode (OPENGROUND_TELEMETRY_MODE)</div>
-                <div style="${UI.value}">${simLine || "—"}</div>
+                <div style="${UI.label}">Link state</div>
+                <div style="${UI.valueLg}">${esc(packet.system_state) || "—"}</div>
               </div>
               <div style="${UI.card}">
-                <div style="${UI.label}">Flight phase</div>
-                <div style="${UI.valueLg}">${esc(packet.phase)}</div>
+                <div style="${UI.label}">Sequence</div>
+                <div style="${UI.value}">SEQ ${c.seq != null ? esc(c.seq) : "—"} · lost ${c.lost != null ? esc(c.lost) : "—"} · loss ${lossStr}</div>
               </div>
               <div style="${UI.card}">
-                <div style="${UI.label}">Ground link state</div>
-                <div style="${UI.valueLg}">${esc(packet.system_state)}</div>
+                <div style="${UI.label}">Ingest mode</div>
+                <div style="${UI.value}">${esc((packet.source || {}).ingest_mode) || "—"}</div>
               </div>
+              ${c.apid != null ? `
               <div style="${UI.card}">
-                <div style="${UI.label}">CCSDS frame</div>
-                <div style="${UI.value}">APID ${apidHex} · SEQ ${seqStr} · ${sizeStr} B · loss ${lossStr}%</div>
-              </div>
+                <div style="${UI.label}">CCSDS</div>
+                <div style="${UI.value}">APID ${apidHex} · ${c.size != null ? esc(c.size) + " B" : "—"}</div>
+              </div>` : ""}
               <div style="${UI.card}">
-                <div style="${UI.label}">Flight rules</div>
-                ${rulesBlock}
-              </div>
-              <div style="${UI.card}">
-                <div style="${UI.label}">Plausibility faults</div>
-                ${faultBlock}
+                <div style="${UI.label}">Limit violations</div>
+                ${violationsBlock}
               </div>
             </div>
           </div>`;
@@ -512,6 +483,17 @@
 
   async function bootstrap() {
     try {
+      const metaRes = await fetch("/api/openmct/telemetry/metadata");
+      const metaPayload = await metaRes.json();
+      const declaredChannels = Array.isArray(metaPayload.channels) ? metaPayload.channels : [];
+      declaredChannels.forEach((c) => {
+        if (c && c.id) channelMeta[c.id] = c;
+      });
+    } catch (e) {
+      console.warn("[OpenGround] Failed to load channel metadata", e);
+    }
+
+    try {
       const res = await fetch("/api/openmct/telemetry/schema");
       const payload = await res.json();
       const schemaChannels = Array.isArray(payload.channels) ? payload.channels : [];
@@ -530,6 +512,29 @@
       openmct.plugins.Conductor({
         menuOptions: [
           {
+            name: "Realtime",
+            timeSystem: "utc",
+            clock: "local",
+            clockOffsets: {
+              start: -FIVE_MINUTES,
+              end: THIRTY_SECONDS,
+            },
+            presets: [
+              {
+                label: "5 minutes",
+                bounds: { start: -FIVE_MINUTES, end: THIRTY_SECONDS },
+              },
+              {
+                label: "30 minutes",
+                bounds: { start: -THIRTY_MINUTES, end: THIRTY_SECONDS },
+              },
+              {
+                label: "1 hour",
+                bounds: { start: -ONE_HOUR, end: THIRTY_SECONDS },
+              },
+            ],
+          },
+          {
             name: "Fixed",
             timeSystem: "utc",
             bounds: {
@@ -538,9 +543,9 @@
             },
             presets: [
               {
-                label: "Last 24 hours",
+                label: "Last 1 hour",
                 bounds: {
-                  start: () => Date.now() - ONE_DAY,
+                  start: () => Date.now() - ONE_HOUR,
                   end: () => Date.now(),
                 },
               },
@@ -552,46 +557,14 @@
                 },
               },
               {
-                label: "Last 1 hour",
+                label: "Last 24 hours",
                 bounds: {
-                  start: () => Date.now() - ONE_HOUR,
+                  start: () => Date.now() - ONE_DAY,
                   end: () => Date.now(),
                 },
               },
             ],
             records: 10,
-          },
-          {
-            name: "Realtime",
-            timeSystem: "utc",
-            clock: "local",
-            clockOffsets: {
-              start: -THIRTY_MINUTES,
-              end: THIRTY_SECONDS,
-            },
-            presets: [
-              {
-                label: "1 hour",
-                bounds: {
-                  start: -ONE_HOUR,
-                  end: THIRTY_SECONDS,
-                },
-              },
-              {
-                label: "30 minutes",
-                bounds: {
-                  start: -THIRTY_MINUTES,
-                  end: THIRTY_SECONDS,
-                },
-              },
-              {
-                label: "5 minutes",
-                bounds: {
-                  start: -FIVE_MINUTES,
-                  end: THIRTY_SECONDS,
-                },
-              },
-            ],
           },
         ],
       })
@@ -607,7 +580,7 @@
 
     installOpenGroundPlugins();
 
-    location.hash = "#/browse/openground:flightDeck";
+    location.hash = "#/browse/openground:overview";
     openmct.start(document.getElementById("openmct"));
   }
 

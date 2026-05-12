@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from openground.ccsds import SEQ_MASK, parse_packet
+from openground.constants import DEFAULT_INGEST_QUEUE_MAXSIZE
 from openground.mission.config import HttpIngestAdapterConfig
 from openground.sdk.adapter import TelemetryAdapter
 from openground.sdk.channel import ChannelSpec
@@ -15,14 +16,17 @@ from openground.services.ingest_normalize import normalize_ingest_fields
 
 log = logging.getLogger(__name__)
 
-_QUEUE_MAXSIZE = 500
-
 
 class HttpIngestAdapter(TelemetryAdapter):
-    def __init__(self, mission_id: str, config: HttpIngestAdapterConfig) -> None:
+    def __init__(
+        self,
+        mission_id: str,
+        config: HttpIngestAdapterConfig,
+        ingest_queue_maxsize: int = DEFAULT_INGEST_QUEUE_MAXSIZE,
+    ) -> None:
         self._mission_id = mission_id
         self._config = config
-        self._queue: asyncio.Queue[TelemetryFrame] = asyncio.Queue(maxsize=_QUEUE_MAXSIZE)
+        self._queue: asyncio.Queue[TelemetryFrame] = asyncio.Queue(maxsize=ingest_queue_maxsize)
         self._seq = -1
 
     @property
