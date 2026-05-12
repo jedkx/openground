@@ -22,7 +22,7 @@ jobs:
 
       - name: Validate conventional commits
         run: |
-          pattern='^(feat|fix|docs|style|refactor|test|chore|ci|perf|revert)(\(.+\))!?: .{1,100}$'
+          pattern='^(feat|fix|docs|style|refactor|test|chore|ci|perf|revert)(\(.+\))?!?: .{1,100}$'
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
           failed=0
