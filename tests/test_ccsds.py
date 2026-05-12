@@ -3,7 +3,6 @@ from __future__ import annotations
 import struct
 
 import pytest
-
 from openground.ccsds import APID_TELEMETRY, parse_packet
 
 

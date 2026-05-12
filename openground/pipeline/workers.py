@@ -24,10 +24,10 @@ class PipelineWorker(ABC):
         )
 
     async def start(self) -> None:
-        pass
+        """Override to acquire resources before the pipeline starts draining."""
 
     async def stop(self) -> None:
-        pass
+        """Override to release resources after the pipeline stops."""
 
 
 class BroadcastWorker(PipelineWorker):

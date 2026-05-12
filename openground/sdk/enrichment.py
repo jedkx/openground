@@ -37,10 +37,10 @@ class EnrichmentStep(ABC):
     async def apply(self, ctx: EnrichmentContext) -> None: ...
 
     def on_client_connected(self) -> None:
-        pass
+        """Override to react when a WebSocket client connects."""
 
     def on_client_disconnected(self, total_clients: int) -> None:
-        pass
+        """Override to react when a WebSocket client disconnects."""
 
     def check_timeout(self) -> None:
-        pass
+        """Override to perform periodic timeout checks."""

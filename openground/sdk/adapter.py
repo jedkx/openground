@@ -26,7 +26,7 @@ class TelemetryAdapter(ABC):
     def stream(self) -> AsyncIterator[TelemetryFrame]: ...
 
     async def start(self) -> None:
-        pass
+        """Override to acquire I/O resources before streaming begins."""
 
     async def stop(self) -> None:
-        pass
+        """Override to release I/O resources after streaming ends."""
