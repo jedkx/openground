@@ -54,7 +54,7 @@ class HttpIngestAdapterConfig:
     token: str = ""
 
 
-AdapterConfig = HttpIngestAdapterConfig
+AdapterConfig = HttpIngestAdapterConfig  # union as new adapters are added
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,10 @@ class MissionConfig:
 
 
 def _parse_adapter(raw: dict[str, Any]) -> AdapterConfig:
-    return HttpIngestAdapterConfig(token=str(raw.get("token", "")))
+    adapter_type = str(raw.get("type", "http_ingest"))
+    if adapter_type == "http_ingest":
+        return HttpIngestAdapterConfig(token=str(raw.get("token", "")))
+    raise ValueError(f"Unknown adapter type {adapter_type!r} — supported: http_ingest")
 
 
 def _parse_channel(raw: dict[str, Any]) -> ChannelSpec:

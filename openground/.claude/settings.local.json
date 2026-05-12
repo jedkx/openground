@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//c/.Extra/openground/tests/**)",
-      "Read(//c/.Extra/openground/**)"
-    ]
-  }
-}
