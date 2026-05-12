@@ -23,10 +23,10 @@ class PipelineWorker(ABC):
             frame.frame.seq,
         )
 
-    async def start(self) -> None:
+    async def start(self) -> None:  # noqa: B027
         """Override to acquire resources before the pipeline starts draining."""
 
-    async def stop(self) -> None:
+    async def stop(self) -> None:  # noqa: B027
         """Override to release resources after the pipeline stops."""
 
 

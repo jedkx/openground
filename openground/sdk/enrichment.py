@@ -36,11 +36,11 @@ class EnrichmentStep(ABC):
     @abstractmethod
     async def apply(self, ctx: EnrichmentContext) -> None: ...
 
-    def on_client_connected(self) -> None:
+    def on_client_connected(self) -> None:  # noqa: B027
         """Override to react when a WebSocket client connects."""
 
-    def on_client_disconnected(self, total_clients: int) -> None:
+    def on_client_disconnected(self, total_clients: int) -> None:  # noqa: B027
         """Override to react when a WebSocket client disconnects."""
 
-    def check_timeout(self) -> None:
+    def check_timeout(self) -> None:  # noqa: B027
         """Override to perform periodic timeout checks."""
