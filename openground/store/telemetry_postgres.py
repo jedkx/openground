@@ -29,7 +29,7 @@ class PostgresTelemetryStore(TelemetryStore):
         self._cfg: StorageConfig = storage_config or StorageConfig()
 
     @classmethod
-    async def connect(cls, dsn: str, **kwargs: Any) -> "PostgresTelemetryStore":
+    async def connect(cls, dsn: str, **kwargs: Any) -> PostgresTelemetryStore:
         storage_config = kwargs.get("storage_config")
         pool_min = kwargs.get("pool_min_size", 1)
         pool_max = kwargs.get("pool_max_size", 8)

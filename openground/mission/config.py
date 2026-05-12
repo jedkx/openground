@@ -31,14 +31,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
-from openground.sdk.channel import ChannelSpec
 from openground.constants import (
-    DEFAULT_INGEST_QUEUE_MAXSIZE,
-    DEFAULT_WORKER_QUEUE_MAXSIZE,
-    DEFAULT_LOST_TIMEOUT_SECONDS,
     DEFAULT_HISTORY_MAXLEN,
+    DEFAULT_INGEST_QUEUE_MAXSIZE,
+    DEFAULT_LOST_TIMEOUT_SECONDS,
+    DEFAULT_WORKER_QUEUE_MAXSIZE,
 )
+from openground.sdk.channel import ChannelSpec
 
 log = logging.getLogger(__name__)
 

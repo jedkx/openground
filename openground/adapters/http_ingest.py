@@ -6,14 +6,13 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-
 from openground.ccsds import SEQ_MASK, parse_packet
+from openground.constants import DEFAULT_INGEST_QUEUE_MAXSIZE
 from openground.mission.config import HttpIngestAdapterConfig
 from openground.sdk.adapter import TelemetryAdapter
 from openground.sdk.channel import ChannelSpec
 from openground.sdk.frame import TelemetryFrame
 from openground.services.ingest_normalize import normalize_ingest_fields
-from openground.constants import DEFAULT_INGEST_QUEUE_MAXSIZE
 
 log = logging.getLogger(__name__)
 

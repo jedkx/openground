@@ -40,6 +40,6 @@ class TelemetryStore(ABC):
 
     @classmethod
     @abstractmethod
-    async def connect(cls, dsn: str, **kwargs: Any) -> "TelemetryStore":
+    async def connect(cls, dsn: str, **kwargs: Any) -> TelemetryStore:
         """Create and return a connected store instance."""
         ...

@@ -7,8 +7,8 @@ remain so that existing deployments continue to work without changes.
 from __future__ import annotations
 
 import os
-
 from dataclasses import dataclass
+
 from openground.constants import (
     DEFAULT_HISTORY_MAXLEN,
     DEFAULT_LOST_TIMEOUT_SECONDS,

@@ -18,7 +18,7 @@ class MemoryTelemetryStore(TelemetryStore):
         self._rows: list[dict[str, Any]] = []
 
     @classmethod
-    async def connect(cls, dsn: str, **kwargs: Any) -> "MemoryTelemetryStore":
+    async def connect(cls, dsn: str, **kwargs: Any) -> MemoryTelemetryStore:
         return cls()
 
     async def insert_from_enriched(self, envelope: dict[str, Any]) -> None:

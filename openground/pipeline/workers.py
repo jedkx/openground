@@ -23,8 +23,11 @@ class PipelineWorker(ABC):
             frame.frame.seq,
         )
 
-    async def start(self) -> None: ...
-    async def stop(self) -> None: ...
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
 
 
 class BroadcastWorker(PipelineWorker):

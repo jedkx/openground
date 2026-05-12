@@ -36,6 +36,11 @@ class EnrichmentStep(ABC):
     @abstractmethod
     async def apply(self, ctx: EnrichmentContext) -> None: ...
 
-    def on_client_connected(self) -> None: ...
-    def on_client_disconnected(self, total_clients: int) -> None: ...
-    def check_timeout(self) -> None: ...
+    def on_client_connected(self) -> None:
+        pass
+
+    def on_client_disconnected(self, total_clients: int) -> None:
+        pass
+
+    def check_timeout(self) -> None:
+        pass

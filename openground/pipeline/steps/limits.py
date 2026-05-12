@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-
+from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -10,23 +10,26 @@ from openground.sdk.channel import ChannelSpec
 from openground.sdk.enrichment import EnrichmentContext, EnrichmentStep
 
 
-
-# --- LimitRule ABC and implementations ---
-from abc import ABC, abstractmethod
-
 class LimitRule(ABC):
     @abstractmethod
-    def check(self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning") -> dict[str, Any] | None:
-        ...
+    def check(
+        self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning"
+    ) -> dict[str, Any] | None: ...
+
 
 class MinLimitRule(LimitRule):
-    def check(self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning") -> dict[str, Any] | None:
+    def check(
+        self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning"
+    ) -> dict[str, Any] | None:
         if spec.min_val is not None and value < spec.min_val:
             return {"channel": name, "value": value, "min": spec.min_val, "severity": severity}
         return None
 
+
 class MaxLimitRule(LimitRule):
-    def check(self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning") -> dict[str, Any] | None:
+    def check(
+        self, name: str, value: Any, spec: ChannelSpec, severity: str = "warning"
+    ) -> dict[str, Any] | None:
         if spec.max_val is not None and value > spec.max_val:
             return {"channel": name, "value": value, "max": spec.max_val, "severity": severity}
         return None

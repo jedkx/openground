@@ -25,5 +25,8 @@ class TelemetryAdapter(ABC):
     @abstractmethod
     def stream(self) -> AsyncIterator[TelemetryFrame]: ...
 
-    async def start(self) -> None: ...
-    async def stop(self) -> None: ...
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
