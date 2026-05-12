@@ -26,6 +26,7 @@ class PostgresTelemetryStore(TelemetryStore):
     def __init__(self, pool: AsyncConnectionPool, storage_config: Any = None) -> None:
         self._pool = pool
         from openground.mission.config import StorageConfig
+
         self._cfg: StorageConfig = storage_config or StorageConfig()
 
     @classmethod

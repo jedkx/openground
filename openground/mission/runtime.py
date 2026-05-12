@@ -70,9 +70,7 @@ class MissionRuntime:
         if start_ms is None or end_ms is None:
             return [f.envelope for f in self._history]
         return [
-            f.envelope
-            for f in self._history
-            if start_ms <= f.envelope.get("epoch_ms", 0) <= end_ms
+            f.envelope for f in self._history if start_ms <= f.envelope.get("epoch_ms", 0) <= end_ms
         ]
 
     def on_client_connected(self) -> None:

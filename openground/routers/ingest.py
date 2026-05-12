@@ -81,7 +81,7 @@ def _require_ingest_adapter(registry: MissionRegistry, mission_id: str | None) -
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Mission {runtime.mission_id!r} does not accept HTTP ingest "
-                   f"(adapter={type(runtime.adapter).__name__})",
+            f"(adapter={type(runtime.adapter).__name__})",
         )
     return runtime.adapter
 

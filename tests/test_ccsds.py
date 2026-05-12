@@ -21,7 +21,7 @@ def test_parse_header_fields() -> None:
 
 
 def test_parse_returns_raw_data_bytes() -> None:
-    payload = b"\xDE\xAD\xBE\xEF"
+    payload = b"\xde\xad\xbe\xef"
     raw = _make_packet(payload=payload)
     assert parse_packet(raw)["data"] == payload
 
