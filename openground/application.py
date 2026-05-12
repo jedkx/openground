@@ -56,9 +56,7 @@ def create_app() -> FastAPI:
 
     async def _get_or_create_store(dsn: str, mc: MissionConfig) -> TelemetryStore:
         if dsn not in _stores:
-            _stores[dsn] = await PostgresTelemetryStore.connect(
-                dsn, storage_config=mc.storage
-            )
+            _stores[dsn] = await PostgresTelemetryStore.connect(dsn, storage_config=mc.storage)
         return _stores[dsn]
 
     @asynccontextmanager

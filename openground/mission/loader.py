@@ -50,13 +50,15 @@ def build_mission_runtime(
     specs = {c.id: c for c in config.channels}
     severities = {c.id: c.severity for c in config.channels}
     state_step = StateStep(StateMachine(config.lost_timeout_seconds))
-    enricher = Enricher(steps=[
-        MetadataStep(mission_id=config.id, source_id=adapter.source_id),
-        SequenceStep(SequenceMonitor()),
-        state_step,
-        CcsdsStep(),
-        LimitViolationStep(specs, severities=severities),
-    ])
+    enricher = Enricher(
+        steps=[
+            MetadataStep(mission_id=config.id, source_id=adapter.source_id),
+            SequenceStep(SequenceMonitor()),
+            state_step,
+            CcsdsStep(),
+            LimitViolationStep(specs, severities=severities),
+        ]
+    )
 
     broadcast_worker = BroadcastWorker()
     pipeline = FanoutPipeline(worker_queue_maxsize=config.pipeline.worker_queue_maxsize)

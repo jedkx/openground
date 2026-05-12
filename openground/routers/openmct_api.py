@@ -18,7 +18,8 @@ def create_openmct_router(registry: MissionRegistry) -> APIRouter:
     def _numeric_keys(envelope: dict) -> list[str]:
         excluded = {"epoch_ms"}
         return sorted(
-            k for k, v in envelope.items()
+            k
+            for k, v in envelope.items()
             if k not in excluded and isinstance(v, (int, float)) and not isinstance(v, bool)
         )
 

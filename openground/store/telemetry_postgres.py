@@ -46,9 +46,9 @@ class PostgresTelemetryStore(TelemetryStore):
             open=False,
         )
         await pool.open()
-        schema_sql = (
-            Path(__file__).resolve().parent / "schema_telemetry.sql"
-        ).read_text(encoding="utf-8")
+        schema_sql = (Path(__file__).resolve().parent / "schema_telemetry.sql").read_text(
+            encoding="utf-8"
+        )
         async with pool.connection() as conn:
             await conn.execute(schema_sql)
         log.info("Postgres telemetry store ready (table=openground_telemetry)")

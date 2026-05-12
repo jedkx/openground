@@ -19,6 +19,7 @@ _OCTET_STREAM = frozenset({"application/octet-stream", "application/x-ccsds-tlm"
 
 class TelemetryPayload(BaseModel):
     """Accepts any JSON object with numeric values — no required fields."""
+
     model_config = ConfigDict(extra="allow")
 
 

@@ -86,7 +86,8 @@ class MissionRuntime:
         await self._pipeline.start()
         self._run_task = asyncio.create_task(self._run(), name=f"mission-run-{self._config.id}")
         self._timeout_task = asyncio.create_task(
-            self._timeout_loop(), name=f"mission-timeout-{self._config.id}"
+            self._timeout_loop(),
+            name=f"mission-timeout-{self._config.id}",
         )
         log.info("Mission %r started (adapter=%s)", self._config.id, type(self._adapter).__name__)
 

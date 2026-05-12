@@ -33,7 +33,8 @@ class MemoryTelemetryStore(TelemetryStore):
         limit: int = 50_000,
     ) -> list[dict[str, Any]]:
         results = [
-            r for r in self._rows
+            r
+            for r in self._rows
             if (mission_id is None or r.get("mission_id") == mission_id)
             and start_ms <= r.get("epoch_ms", 0) <= end_ms
         ]
