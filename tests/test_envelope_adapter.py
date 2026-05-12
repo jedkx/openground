@@ -10,7 +10,7 @@ from openground.application import create_app
 def test_envelope_accepts_external_event_id() -> None:
     client = TestClient(create_app())
     r = client.post(
-        "/api/v1/adapters/envelope",
+        "/api/missions/raspberry-pi/adapters/envelope",
         json={
             "external_event_id": "evt-101",
             "event_type": "telemetry.normalized",
@@ -34,7 +34,7 @@ def test_envelope_accepts_external_event_id() -> None:
 def test_envelope_accepts_relay_compat_alias() -> None:
     client = TestClient(create_app())
     r = client.post(
-        "/api/v1/adapters/envelope",
+        "/api/missions/raspberry-pi/adapters/envelope",
         json={
             "relay_event_id": "evt-compat-1",
             "event_type": "telemetry.normalized",

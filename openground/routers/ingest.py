@@ -87,26 +87,7 @@ def _require_ingest_adapter(registry: MissionRegistry, mission_id: str | None) -
 
 def create_ingest_router(registry: MissionRegistry) -> APIRouter:
     router = APIRouter(tags=["ingest"])
-    legacy = APIRouter(prefix="/api/v1/ingest")
     missions = APIRouter(prefix="/api/missions")
-
-    @legacy.post("/telemetry", status_code=status.HTTP_202_ACCEPTED)
-    async def post_telemetry_legacy(body: TelemetryPayload, request: Request) -> dict[str, str]:
-        adapter = _require_ingest_adapter(registry, None)
-        verify_ingest_token(adapter.token, request)
-        await adapter.push_normalized(body.model_dump(), _meta("http_json", None, None))
-        return {"status": "accepted", "mode": "normalized"}
-
-    @legacy.post("/packet", status_code=status.HTTP_202_ACCEPTED)
-    async def post_packet_legacy(request: Request) -> dict[str, Any]:
-        adapter = _require_ingest_adapter(registry, None)
-        verify_ingest_token(adapter.token, request)
-        raw, source, ingress_id = await _read_raw_packet(request)
-        try:
-            await adapter.push_ccsds(raw, _meta("ccsds_raw", source, ingress_id))
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        return {"status": "accepted", "mode": "ccsds_raw", "bytes": len(raw)}
 
     @missions.post("/{mission_id}/ingest/telemetry", status_code=status.HTTP_202_ACCEPTED)
     async def post_telemetry(
@@ -130,6 +111,5 @@ def create_ingest_router(registry: MissionRegistry) -> APIRouter:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         return {"status": "accepted", "mode": "ccsds_raw", "bytes": len(raw), "mission": mission_id}
 
-    router.include_router(legacy)
     router.include_router(missions)
     return router

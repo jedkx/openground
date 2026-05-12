@@ -14,3 +14,5 @@ class ChannelSpec:
     min_val: float | None = None
     max_val: float | None = None
     description: str = ""
+    severity: str = "warning"  # e.g. "warning", "critical"
+    rules: tuple[str, ...] = ()  # e.g. ("min", "max")

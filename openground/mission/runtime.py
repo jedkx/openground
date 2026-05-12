@@ -11,8 +11,8 @@ from openground.pipeline.pipeline import FanoutPipeline
 from openground.pipeline.workers import BroadcastWorker
 from openground.sdk.adapter import TelemetryAdapter
 from openground.sdk.frame import EnrichedFrame
+from openground.sdk.store import TelemetryStore
 from openground.services.connection import ConnectionManager
-from openground.store.telemetry_postgres import TelemetryStore
 
 log = logging.getLogger(__name__)
 
@@ -22,17 +22,17 @@ class MissionRuntime:
         self,
         config: MissionConfig,
         adapter: TelemetryAdapter,
+        enricher: Enricher,
         pipeline: FanoutPipeline,
         broadcast_worker: BroadcastWorker,
         store: TelemetryStore | None = None,
     ) -> None:
         self._config = config
         self._adapter = adapter
+        self._enricher = enricher
         self._pipeline = pipeline
         self._broadcast_worker = broadcast_worker
         self._store = store
-        specs = {c.id: c for c in config.channels}
-        self._enricher = Enricher(config.id, config.lost_timeout_seconds, specs)
         self._latest: EnrichedFrame | None = None
         self._history: deque[EnrichedFrame] = deque(maxlen=config.history_maxlen)
         self._run_task: asyncio.Task[None] | None = None
@@ -107,7 +107,7 @@ class MissionRuntime:
     async def _run(self) -> None:
         try:
             async for frame in self._adapter.stream():
-                enriched = self._enricher.process(frame)
+                enriched = await self._enricher.process(frame)
                 self._latest = enriched
                 self._history.append(enriched)
                 await self._pipeline.publish(enriched)
@@ -118,6 +118,7 @@ class MissionRuntime:
             raise
 
     async def _timeout_loop(self) -> None:
+        interval = self._config.pipeline.timeout_check_interval_seconds
         while True:
             self._enricher.check_timeout()
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(interval)

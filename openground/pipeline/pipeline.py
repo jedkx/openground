@@ -8,18 +8,17 @@ from openground.sdk.frame import EnrichedFrame
 
 log = logging.getLogger(__name__)
 
-_QUEUE_MAXSIZE = 1_000
-
 
 class FanoutPipeline:
-    def __init__(self) -> None:
+    def __init__(self, worker_queue_maxsize: int = 1_000) -> None:
+        self._maxsize = worker_queue_maxsize
         self._slots: list[tuple[PipelineWorker, asyncio.Queue[EnrichedFrame]]] = []
         self._drain_tasks: list[asyncio.Task[None]] = []
 
     def add_worker(self, worker: PipelineWorker) -> None:
         if self._drain_tasks:
             raise RuntimeError("Cannot add workers after pipeline.start()")
-        self._slots.append((worker, asyncio.Queue(maxsize=_QUEUE_MAXSIZE)))
+        self._slots.append((worker, asyncio.Queue(maxsize=self._maxsize)))
 
     async def start(self) -> None:
         for worker, q in self._slots:
@@ -58,7 +57,7 @@ class FanoutPipeline:
                 await worker.handle(frame)
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                log.exception("Unhandled error in %s.handle()", type(worker).__name__)
+            except Exception as exc:
+                await worker.on_error(exc, frame)
             finally:
                 q.task_done()

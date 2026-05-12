@@ -1,4 +1,4 @@
-"""Append-only telemetry archive for history queries beyond the in-memory deque."""
+"""Postgres-backed TelemetryStore — append-only archive for history queries."""
 
 from __future__ import annotations
 
@@ -10,10 +10,12 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from openground.sdk.store import TelemetryStore
+
 log = logging.getLogger(__name__)
 
 
-class TelemetryStore:
+class PostgresTelemetryStore(TelemetryStore):
     """Postgres-backed storage for finalized telemetry frames.
 
     All missions share a single table; ``mission_id`` is used to scope queries.
@@ -21,15 +23,25 @@ class TelemetryStore:
     new columns) are always present before the first insert.
     """
 
-    def __init__(self, pool: AsyncConnectionPool) -> None:
+    def __init__(self, pool: AsyncConnectionPool, storage_config: Any = None) -> None:
         self._pool = pool
+        from openground.mission.config import StorageConfig
+        self._cfg: StorageConfig = storage_config or StorageConfig()
 
     @classmethod
-    async def connect(cls, dsn: str) -> TelemetryStore:
+    async def connect(cls, dsn: str, **kwargs: Any) -> "PostgresTelemetryStore":
+        storage_config = kwargs.get("storage_config")
+        pool_min = kwargs.get("pool_min_size", 1)
+        pool_max = kwargs.get("pool_max_size", 8)
+
+        if storage_config is not None:
+            pool_min = storage_config.pool_min_size
+            pool_max = storage_config.pool_max_size
+
         pool = AsyncConnectionPool(
             conninfo=dsn,
-            min_size=1,
-            max_size=8,
+            min_size=pool_min,
+            max_size=pool_max,
             kwargs={"row_factory": dict_row},
             open=False,
         )
@@ -40,7 +52,7 @@ class TelemetryStore:
         async with pool.connection() as conn:
             await conn.execute(schema_sql)
         log.info("Postgres telemetry store ready (table=openground_telemetry)")
-        return cls(pool)
+        return cls(pool, storage_config)
 
     async def close(self) -> None:
         await self._pool.close()
@@ -92,13 +104,13 @@ class TelemetryStore:
         end_ms: int,
         *,
         mission_id: str | None = None,
-        limit: int = 50_000,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Return enriched envelopes in ascending event-time order.
+        """Return enriched envelopes in ascending event-time order."""
+        default_limit = self._cfg.query_default_limit
+        max_limit = self._cfg.query_max_limit
+        cap = max(1, min(limit if limit is not None else default_limit, max_limit))
 
-        When ``mission_id`` is provided the query is scoped to that mission.
-        """
-        cap = max(1, min(limit, 200_000))
         if mission_id is not None:
             sql = """
                 SELECT envelope

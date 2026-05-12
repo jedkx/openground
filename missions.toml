@@ -8,17 +8,23 @@ name = "Raspberry Pi"
 
 [missions.adapter]
 type  = "http_ingest"
-token = "change-me"
+token = ""
 
 # Optional: declare channels to get limit violation alerts.
 # Any channel not declared here passes through without checks.
+
 [[missions.channels]]
 id    = "temperature"
 unit  = "°C"
 max   = 80.0
+severity = "critical"
+rules = ["max"]
+
 
 [[missions.channels]]
 id    = "ram_usage"
 unit  = "%"
 min   = 0.0
 max   = 100.0
+severity = "warning"
+rules = ["min", "max"]
