@@ -32,6 +32,11 @@ def _build_adapter(mission_id: str, config: AdapterConfig, queue_maxsize: int) -
     union in mission/config.py, and add a branch here.
     """
     if isinstance(config, HttpIngestAdapterConfig):
+        if not config.token:
+            log.warning(
+                "Mission %r has no ingest token set — all ingest requests will be accepted without authentication",
+                mission_id,
+            )
         return HttpIngestAdapter(
             mission_id=mission_id,
             config=config,

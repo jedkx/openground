@@ -23,14 +23,14 @@
   const statusListeners = new Set();
   let socket = null;
 
-  const THIRTY_SECONDS = 30 * 1000;
-  const ONE_MINUTE = THIRTY_SECONDS * 2;
-  const FIVE_MINUTES = ONE_MINUTE * 5;
-  const FIFTEEN_MINUTES = FIVE_MINUTES * 3;
-  const THIRTY_MINUTES = FIFTEEN_MINUTES * 2;
-  const ONE_HOUR = THIRTY_MINUTES * 2;
-  const TWO_HOURS = ONE_HOUR * 2;
-  const ONE_DAY = ONE_HOUR * 24;
+  const THIRTY_SECONDS = 30_000;
+  const ONE_MINUTE = 60_000;
+  const FIVE_MINUTES = 300_000;
+  const FIFTEEN_MINUTES = 900_000;
+  const THIRTY_MINUTES = 1_800_000;
+  const ONE_HOUR = 3_600_000;
+  const TWO_HOURS = 7_200_000;
+  const ONE_DAY = 86_400_000;
 
   function titleCase(key) {
     return String(key)
@@ -109,7 +109,8 @@
       let packet;
       try {
         packet = JSON.parse(event.data);
-      } catch {
+      } catch (err) {
+        console.warn("[OpenGround] Malformed WebSocket message (first 200 chars):", String(event.data).slice(0, 200), err);
         return;
       }
       if (!packet || typeof packet.epoch_ms !== "number") {

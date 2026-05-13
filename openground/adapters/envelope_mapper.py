@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 from fastapi import HTTPException, status
 
 
+@overload
+def _as_string(value: Any, field: str, *, required: Literal[True]) -> str: ...
+@overload
+def _as_string(value: Any, field: str, *, required: bool = False) -> str | None: ...
 def _as_string(value: Any, field: str, *, required: bool = False) -> str | None:
     if value is None:
         if required:
@@ -35,7 +39,6 @@ def envelope_identifiers(body: dict[str, Any]) -> tuple[str, str]:
         required=True,
     )
     event_type = _as_string(body.get("event_type"), "event_type", required=True)
-    assert external_id is not None and event_type is not None
     return external_id, event_type
 
 

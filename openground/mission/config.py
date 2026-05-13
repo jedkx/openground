@@ -181,6 +181,7 @@ def load_missions_file(path: str) -> list[MissionConfig]:
     for raw in missions_raw:
         try:
             configs.append(_parse_mission(raw))
-        except Exception:
-            log.exception("Skipping malformed mission entry: %r", raw.get("id", "<unknown>"))
+        except (ValueError, KeyError, TypeError) as exc:
+            mission_id = raw.get("id", "<unknown>") if isinstance(raw, dict) else "<unknown>"
+            log.exception("Skipping malformed mission entry %r: %s", mission_id, exc)
     return configs
