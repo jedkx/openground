@@ -50,8 +50,12 @@ class PostgresTelemetryStore(TelemetryStore):
         schema_sql = (Path(__file__).resolve().parent / "schema_telemetry.sql").read_text(
             encoding="utf-8"
         )
-        async with pool.connection() as conn:
-            await conn.execute(schema_sql)
+        try:
+            async with pool.connection() as conn:
+                await conn.execute(schema_sql)
+        except Exception as exc:
+            await pool.close()
+            raise RuntimeError(f"Failed to apply telemetry schema: {exc}") from exc
         log.info("Postgres telemetry store ready (table=openground_telemetry)")
         return cls(pool, storage_config)
 

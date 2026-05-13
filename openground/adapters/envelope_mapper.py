@@ -35,7 +35,6 @@ def envelope_identifiers(body: dict[str, Any]) -> tuple[str, str]:
         required=True,
     )
     event_type = _as_string(body.get("event_type"), "event_type", required=True)
-    assert external_id is not None and event_type is not None
     return external_id, event_type
 
 
