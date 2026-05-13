@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 from fastapi import HTTPException, status
 
 
+@overload
+def _as_string(value: Any, field: str, *, required: Literal[True]) -> str: ...
+@overload
+def _as_string(value: Any, field: str, *, required: bool = False) -> str | None: ...
 def _as_string(value: Any, field: str, *, required: bool = False) -> str | None:
     if value is None:
         if required:

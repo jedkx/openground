@@ -110,7 +110,7 @@
       try {
         packet = JSON.parse(event.data);
       } catch (err) {
-        console.warn("[OpenGround] Malformed WebSocket message:", event.data, err);
+        console.warn("[OpenGround] Malformed WebSocket message (first 200 chars):", String(event.data).slice(0, 200), err);
         return;
       }
       if (!packet || typeof packet.epoch_ms !== "number") {

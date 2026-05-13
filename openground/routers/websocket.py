@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
@@ -28,6 +29,8 @@ def register_websocket(app: FastAPI, registry: MissionRegistry) -> None:
                 await websocket.receive_text()
         except WebSocketDisconnect:
             log.debug("WebSocket disconnected (mission=%s)", runtime.mission_id)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             log.exception("Unexpected error in WebSocket handler (mission=%s)", runtime.mission_id)
         finally:
